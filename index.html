@@ -56,26 +56,32 @@ details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summ
 <dl class="method">
 <div>
 <dt>Scaled CRPS9</dt>
-<dd>Divide each raw quantile case score by <code>max(mean of observed training counts, 1)</code>. Apply the arithmetic average described below. The scale measures the series’ historical activity, and every eligible case contributes to the average.</dd>
+<dd>Divide each raw quantile case score by <code>max(mean of observed training counts, 1)</code>. Apply the arithmetic average described below. The scale measures the series’ historical activity, and every eligible case contributes to the average.
+<p><strong>What it emphasizes.</strong> The same count error costs more on a quieter series, up to the scale floor. A large scaled miss can outweigh several small improvements. Calibration by quantile or dependence across forecast leads requires additional diagnostics.</p></dd>
 </div>
 <div>
 <dt>Paper CRPS</dt>
-<dd>Take the median of the raw quantile case scores within each category and origin, then divide by that cell’s Zero reference. Take the median across all included category–origin cells. The two medians can produce a score of zero even when some series have positive loss.</dd>
+<dd>Take the median of the raw quantile case scores within each category and origin, then divide by that cell’s Zero reference. Take the median across all included category–origin cells. Each cell contributes one value to the final median, regardless of its series count. Frequencies with more cells contribute more values.
+<p><strong>What it emphasizes.</strong> The typical Zero-relative cell. Severe misses on a minority of series or origins can leave the medians unchanged. Many zero-loss cells can produce a final score of zero alongside positive losses elsewhere.</p></dd>
 </div>
 <div>
 <dt>RMSSE</dt>
-<dd>For each case, divide the mean squared point error over leads by the mean squared difference between consecutive training observations. Take the square root for each case, then apply the arithmetic average. The common eligibility mask excludes cases with a zero squared-difference scale.</dd>
+<dd>For each case, divide the mean squared point error over leads by the mean squared difference between consecutive training observations. Take the square root for each case, then apply the arithmetic average. The common eligibility mask excludes cases with a zero squared-difference scale.
+<p><strong>What it emphasizes.</strong> Large misses within multi-step forecasts and errors on series that usually change little. At one lead the formula is an absolute error divided by the training root mean square difference. A partly flat history can give an eligible case a small denominator.</p></dd>
 </div>
 <div>
 <dt>MASE</dt>
-<dd>For each case, divide the mean absolute point error over leads by <code>max(mean absolute difference between consecutive training observations, 0.01)</code>. Apply the arithmetic average.</dd>
+<dd>For each case, divide the mean absolute point error over leads by <code>max(mean absolute difference between consecutive training observations, 0.01)</code>. Apply the arithmetic average.
+<p><strong>What it emphasizes.</strong> The size of a point error relative to routine changes. At a fixed scale losses rise linearly with absolute error. Small training scales give quiet series more weight per unit of error. Use the probability scores to compare forecast uncertainty.</p></dd>
 </div>
 <div>
 <dt>Public MASE</dt>
-<dd>Take the median of the case MASE scores within each category and origin, then divide by that cell’s Zero reference. Average the normalized cells with the same recorded cutoff, then average those cutoff scores. The cutoff grouping can pool cells across frequencies.</dd>
+<dd>Take the median of the case MASE scores within each category and origin, then divide by that cell’s Zero reference. Average the normalized cells with the same recorded cutoff, then average those cutoff scores. Cells that share a cutoff split its weight, including across frequencies. A frequency with more distinct cutoffs can have more influence overall.
+<p><strong>What it emphasizes.</strong> The size of changes in typical category errors. The first median can hide large minority misses. A small Zero denominator can amplify a cell’s contribution to the cutoff average.</p></dd>
 </div>
 </dl>
-<p><strong>Arithmetic average.</strong> For Scaled CRPS9, RMSSE and MASE, average eligible series equally at each origin, average origins equally within each frequency, then average the included frequencies equally.</p>
+<p><strong>Arithmetic average.</strong> For Scaled CRPS9, RMSSE and MASE, average eligible series equally at each origin, average origins equally within each frequency, then average the included frequencies equally. In the all-frequency view here, monthly gets the same one-third weight as daily. One of the two monthly origins therefore has seven times the total weight of one of the 14 daily origins.</p>
+<p><strong>Why the rankings can differ.</strong> Suppose A scores 1 and 1 on two daily origins and 6 on one weekly origin. B scores 3 on all three. With one category per origin and three distinct cutoffs, A wins two origins and has the lower median (1 vs 3) and cutoff average (2.67 vs 3). B wins on the equal-frequency average (3 vs 3.50), since weekly gets half the weight. Large weighted gains can offset many small losses. Use the paired win counts to see how often a model beats SeasonalNaive, and the frequency and sparsity filters to see where.</p>
 <p><strong>Zero reference.</strong> A category combines an event subdataset and a sparsity band. For each category, frequency and origin, score a forecast of zero using the same case loss. The denominator is the greater of the median Zero loss and the 10th percentile of strictly positive Zero losses, using linear interpolation. If all Zero losses are zero, use 0.001. This applies to Paper CRPS and Public MASE.</p>
 <p class="hint">The Paper CRPS view follows the paper’s quantile loss and final median, with the category cells and zero-loss fallback defined above. <a href="https://arxiv.org/html/2603.08707#S3">Impermanent paper, evaluation protocol</a></p>
 </details>
@@ -88,6 +94,7 @@ details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summ
 <span>Gap = foundation score − non-foundation score.</span>
 <span>Percentages divide the gap by the non-foundation score. A zero denominator shows the signed difference in score units.</span>
 </p>
+<p class="hint">Each cell compares the best entry from each family in that slice. The panel has four foundation and ten non-foundation entries, and the slices share forecast cases.</p>
 <div class="tablebox"><table class="matrix" aria-describedby="family-gap-key"><caption class="sr">Best foundation and non-foundation model by frequency and sparsity</caption>
 <thead><tr><th scope="col">Frequency</th><th scope="col">All series</th><th scope="col">Low sparsity</th><th scope="col">Medium sparsity</th><th scope="col">High sparsity</th></tr></thead><tbody id="matrix"></tbody></table></div>
 </section>
