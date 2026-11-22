@@ -25,7 +25,13 @@ td.state{color:var(--muted)}.family{font-size:12px;font-weight:650;white-space:n
 .matrix small{display:block;color:var(--muted);white-space:normal}.matrix th[scope=row]{font-size:13px}.matrix th:first-child{width:101px}
 .pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 30px;margin:0 0 15px;font-size:14px}.pair strong{display:block;font-weight:650;font-size:16px}
 .scores .model th{white-space:normal;min-width:154px}.scores .score-state{white-space:nowrap}.badge{display:inline-block;margin-left:8px;background:#edf2f7;color:var(--muted);padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600}
-.method{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 22px}.method div{margin:2px 0 10px}.method dt{font-weight:700}.method dd{margin:3px 0;color:var(--muted)}
+.metric-guide{margin:12px 0 24px;font-size:1rem}
+.method{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 22px;margin:16px 0}
+.method div{border-top:1px solid var(--line);padding-top:9px}.method dt{font-weight:700}.method dd{margin:3px 0;color:var(--muted)}
+.metric-guide code{font-family:ui-monospace,Consolas,monospace;font-size:.88em;overflow-wrap:anywhere}
+.metric-guide p:last-child{margin-bottom:0}
+.gap-key{display:flex;flex-wrap:wrap;column-gap:19px;row-gap:4px;margin:0 0 12px}
+.gap-key strong{font-weight:750}
 details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summary{margin-bottom:15px}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 @media(max-width:640px){main,.hero{padding-left:14px;padding-right:14px}.controls{gap:9px}.method,.pair{grid-template-columns:1fr}.summary{font-size:14px}.group{padding:14px 12px}}
 </style>
@@ -38,15 +44,51 @@ details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summ
 <main>
 <div class="summary"><p id="readiness" aria-live="polite"></p><p class="stamp" id="stamp"></p></div>
 <div class="controls">
-<label>Metric<select id="metric"></select></label>
+<label>Metric<select id="metric" aria-describedby="metric-definition"></select></label>
 <label>Frequency<select id="frequency"><option value="all">All frequencies</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
 <label>Sparsity<select id="sparsity"><option value="all">All series</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
 </div>
-<p class="hint" id="metric-definition"></p>
+<p class="hint" id="metric-definition" aria-live="polite"></p>
+<details class="group metric-guide" id="metric-guide">
+<summary>Metric definitions and aggregation</summary>
+<p>Lower scores are better. A <strong>case</strong> is one series at one forecast origin. A lead is one forecast step. Each training scale uses only observations available for that series at that origin.</p>
+<p><strong>Both CRPS scores use the same quantile loss.</strong> For observed count <var>y</var> and predicted quantile <var>q</var> at level <var>τ</var>, pinball loss is <code>τ × max(y − q, 0) + (1 − τ) × max(q − y, 0)</code>. The raw case score is twice the average of this loss over the forecast leads and the nine levels 0.1 through 0.9.</p>
+<dl class="method">
+<div>
+<dt>Scaled CRPS9</dt>
+<dd>Divide each raw quantile case score by <code>max(mean of observed training counts, 1)</code>. Apply the arithmetic average described below. The scale measures the series’ historical activity, and every eligible case contributes to the average.</dd>
+</div>
+<div>
+<dt>Paper CRPS</dt>
+<dd>Take the median of the raw quantile case scores within each category and origin, then divide by that cell’s Zero reference. Take the median across all included category–origin cells. The two medians can produce a score of zero even when some series have positive loss.</dd>
+</div>
+<div>
+<dt>RMSSE</dt>
+<dd>For each case, divide the mean squared point error over leads by the mean squared difference between consecutive training observations. Take the square root for each case, then apply the arithmetic average. The common eligibility mask excludes cases with a zero squared-difference scale.</dd>
+</div>
+<div>
+<dt>MASE</dt>
+<dd>For each case, divide the mean absolute point error over leads by <code>max(mean absolute difference between consecutive training observations, 0.01)</code>. Apply the arithmetic average.</dd>
+</div>
+<div>
+<dt>Public MASE</dt>
+<dd>Take the median of the case MASE scores within each category and origin, then divide by that cell’s Zero reference. Average the normalized cells with the same recorded cutoff, then average those cutoff scores. The cutoff grouping can pool cells across frequencies.</dd>
+</div>
+</dl>
+<p><strong>Arithmetic average.</strong> For Scaled CRPS9, RMSSE and MASE, average eligible series equally at each origin, average origins equally within each frequency, then average the included frequencies equally.</p>
+<p><strong>Zero reference.</strong> A category combines an event subdataset and a sparsity band. For each category, frequency and origin, score a forecast of zero using the same case loss. The denominator is the greater of the median Zero loss and the 10th percentile of strictly positive Zero losses, using linear interpolation. If all Zero losses are zero, use 0.001. This applies to Paper CRPS and Public MASE.</p>
+<p class="hint">The Paper CRPS view follows the paper’s quantile loss and final median, with the category cells and zero-loss fallback defined above. <a href="https://arxiv.org/html/2603.08707#S3">Impermanent paper, evaluation protocol</a></p>
+</details>
 <section aria-labelledby="comparison-heading" class="group">
 <h2 id="comparison-heading">Where each family leads</h2>
 <div class="pair" id="pair"></div>
-<div class="tablebox"><table class="matrix"><caption class="sr">Best foundation and non-foundation model by frequency and sparsity</caption>
+<p class="hint gap-key" id="family-gap-key">
+<span><strong class="foundation">−</strong> Minus favors foundation</span>
+<span><strong class="nonfoundation">+</strong> Plus favors non-foundation</span>
+<span>Gap = foundation score − non-foundation score.</span>
+<span>Percentages divide the gap by the non-foundation score. A zero denominator shows the signed difference in score units.</span>
+</p>
+<div class="tablebox"><table class="matrix" aria-describedby="family-gap-key"><caption class="sr">Best foundation and non-foundation model by frequency and sparsity</caption>
 <thead><tr><th scope="col">Frequency</th><th scope="col">All series</th><th scope="col">Low sparsity</th><th scope="col">Medium sparsity</th><th scope="col">High sparsity</th></tr></thead><tbody id="matrix"></tbody></table></div>
 </section>
 <section aria-labelledby="ranks-heading"><h2 id="ranks-heading">Model leaderboard</h2>
@@ -54,16 +96,15 @@ details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summ
 <div class="tablebox"><table class="scores"><caption class="sr">Model scores on the selected historical cohort</caption>
 <thead><tr><th scope="col" id="rank-header"><button data-sort="rank">Rank</button></th><th scope="col" id="name-header"><button data-sort="name">Model</button></th><th scope="col">Family</th><th scope="col" id="score-header"><button data-sort="score">Score</button></th><th scope="col" id="change_vs_seasonal-header"><button data-sort="change_vs_seasonal">Δ vs SeasonalNaive</button></th><th scope="col">Origin W / T / L</th><th scope="col">Panel coverage</th><th scope="col">Forecast source</th></tr></thead>
 <tbody id="ranks"></tbody></table></div>
-<p class="hint">Lower is better. Wins, ties and losses compare each model with SeasonalNaive on paired origins. Percentage gaps need a positive reference score.</p>
+<p class="hint">Lower is better. Δ compares each score with SeasonalNaive as a percentage of its score. Negative is better. Wins, ties and losses compare the models on identical origins using each metric’s within-origin reduction.</p>
 </section>
 <section class="group"><details><summary>Calibration and interval width</summary>
-<p class="hint">Coverage and width describe the reported 10th to 90th percentile interval. Strict and inclusive median rates reveal the effect of ties on observed counts.</p>
+<p class="hint">Coverage is the share of observations inside the q10–q90 interval, including its endpoints. Scaled width is (q90 − q10) divided by the training activity scale used in Scaled CRPS9. The two median rates count observations below q50 and at or below q50. These diagnostics use the same arithmetic averaging across leads, series, origins and frequencies.</p>
 <div class="tablebox"><table><caption class="sr">Calibration statistics where forecast quantiles are available</caption>
 <thead><tr><th scope="col">Model</th><th scope="col">80% interval coverage</th><th scope="col">Scaled interval width</th><th scope="col">Below median</th><th scope="col">At or below median</th></tr></thead><tbody id="calibration"></tbody></table></div>
 </details></section>
 <section class="group"><details><summary>Evaluation methods</summary>
-<dl class="method" id="methods"></dl>
-<p class="hint">The historical panel contains 14 daily, 13 weekly and two monthly origins with 7, 1 and 1 leads respectively. Arithmetic scores give equal weight to eligible series within origins, then to origins within frequencies, then to frequencies. RMSSE excludes zero-scale cases consistently. Sparsity groups follow the frozen Impermanent labels.</p>
+<p class="hint">The historical panel contains 14 daily, 13 weekly and two monthly origins with 7, 1 and 1 leads respectively. Sparsity groups follow the frozen Impermanent labels.</p>
 <p class="hint">The shared history policy was selected by a Development-only comparison with a two-year window. Models use timestamp-derived calendar inputs through their supported interfaces. Tree and statistical controls use lead-specific residual quantiles from earlier, non-overlapping Development origins. The forecast archives preserve each model’s point and distribution outputs.</p>
 </details></section>
 </main>
@@ -74,13 +115,18 @@ const get = id => document.getElementById(id);
 const make = (tag, text, cls) => { const node = document.createElement(tag); if (text != null) node.textContent = text; if (cls) node.className = cls; return node; };
 const format = x => x == null ? '—' : Number(x).toLocaleString('en', {minimumFractionDigits:5, maximumFractionDigits:5});
 const pct = x => x == null ? '—' : (x > 0 ? '+' : '') + x.toFixed(2) + '%';
+const signed = x => (x > 0 ? '+' : x < 0 ? '−' : '') + format(Math.abs(x));
 const percent = x => (100 * x).toFixed(1) + '%';
 const fs = Object.entries({all:'Overall',daily:'Daily',weekly:'Weekly',monthly:'Monthly'});
 const ss = ['all','low','medium','high'];
 const fc = x => x === 'Foundation' ? 'foundation' : 'nonfoundation';
 const args = new URL(location.href).searchParams;
 let sort = 'score', ascending = true;
-Object.entries(data.metrics).forEach(([key, val]) => { const option = make('option',val.label); option.value = key; get('metric').append(option); const pair = make('div'); pair.append(make('dt',val.label),make('dd',val.description)); get('methods').append(pair); });
+for (const [key, metric] of Object.entries(data.metrics)) {
+    const option = make('option', metric.label);
+    option.value = key;
+    get('metric').append(option);
+}
 for (const id of ['metric','frequency','sparsity']) { const saved = args.get(id), el = get(id); if (saved && [...el.options].some(x => x.value === saved)) el.value = saved; el.addEventListener('change', render); }
 get('readiness').textContent = `${data.complete_models} of ${data.total_models} models complete · ${data.origins} origins · ${data.target_cells.toLocaleString()} targets`;
 get('stamp').textContent = 'Updated ' + data.updated;
@@ -100,8 +146,10 @@ function render(){
             const row=data.families.find(r => r.metric===metric && r.frequency===key && r.sparsity===band);
             const td=make('td'); const b=make('button',row ? (row.leader==='tie'?'Tie':row.leader==='foundation'?'Foundation':'Non-foundation') : 'Pending',row?.leader);
             b.type='button'; b.setAttribute('aria-pressed',String(freq===key && sparsity===band));
-            b.setAttribute('aria-label',`${label}, ${band==='all'?'all series':band+' sparsity'}: ${b.textContent}`);
-            if(row) b.append(make('small',row.relative == null ? `${format(row.difference)} absolute gap` : `${pct(row.relative)} foundation gap`));
+            const description = `${label}, ${band==='all'?'all series':band+' sparsity'}: ${b.textContent}`;
+            const gap = row ? (row.relative == null ? `${signed(row.difference)} score units` : `${pct(row.relative)} gap`) : '';
+            b.setAttribute('aria-label', gap ? `${description}, ${gap}` : description);
+            if (gap) b.append(make('small', gap));
             b.onclick=()=>{get('frequency').value=key; get('sparsity').value=band; render(); [...matrix.querySelectorAll('button')].find(node=>node.getAttribute('aria-pressed')==='true')?.focus();};
             td.append(b);tr.append(td);
         } matrix.append(tr);
