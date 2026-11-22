@@ -14,7 +14,7 @@ main{max-width:1300px;margin:0 auto;padding:0 30px 40px}header{background:var(--
 .brand{color:#b6d7e4;font-weight:700;font-size:13px;letter-spacing:.13em;text-transform:uppercase}.hero p{max-width:830px;margin:0;color:#d6e4f1;font-size:16px}
 h2{font:600 27px/1.2 Georgia,serif;margin:0 0 13px}h3{margin:0;font-size:15px}p{margin:.45em 0 1em}.summary{padding:20px 0 18px;display:flex;gap:10px 24px;flex-wrap:wrap;border-bottom:1px solid var(--line);justify-content:space-between}
 .summary strong{font-variant-numeric:tabular-nums}.summary p{margin:0}.stamp,.hint{color:var(--muted);font-size:13px}.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:end;padding:20px 0 16px}
-label{display:grid;gap:4px;font-weight:650;font-size:12px;color:var(--muted)}select,button{font:inherit;color:inherit;cursor:pointer}select{background:var(--sheet);border:1px solid var(--line);border-radius:5px;padding:8px 10px;color:var(--ink);font-size:15px}
+label{display:grid;gap:4px;font-weight:650;font-size:12px;color:var(--muted)}select,input[type=date],button{font:inherit;color:inherit;cursor:pointer}select,input[type=date]{background:var(--sheet);border:1px solid var(--line);border-radius:5px;padding:8px 10px;color:var(--ink);font-size:15px}
 :focus-visible{outline:3px solid #26718e;outline-offset:3px}section{margin:22px 0 28px}.tablebox{border:1px solid var(--line);background:var(--sheet);border-radius:8px;overflow:auto;max-height:720px}
 table{border-collapse:collapse;width:100%;min-width:710px}th,td{padding:11px 13px;border-bottom:1px solid #e1e7ef;text-align:left;white-space:nowrap}
 thead th{background:#e8eef5;position:sticky;top:0;z-index:2;font-size:12px;letter-spacing:.02em;color:var(--navy)}tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
@@ -32,6 +32,9 @@ td.state{color:var(--muted)}.family{font-size:12px;font-weight:650;white-space:n
 .metric-guide p:last-child{margin-bottom:0}
 .gap-key{display:flex;flex-wrap:wrap;column-gap:19px;row-gap:4px;margin:0 0 12px}
 .gap-key strong{font-weight:750}
+.cutoff-controls{display:flex;align-items:end;gap:14px;flex-wrap:wrap}.cutoff-controls[hidden]{display:none}
+.cutoff-controls button{background:var(--sheet);border:1px solid var(--line);border-radius:5px;padding:7px 10px}
+.cutoff-controls input{min-width:140px}
 details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summary{margin-bottom:15px}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 @media(max-width:640px){main,.hero{padding-left:14px;padding-right:14px}.controls{gap:9px}.method{grid-template-columns:1fr}.summary{font-size:14px}.group{padding:14px 12px}}
 </style>
@@ -47,7 +50,13 @@ details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summ
 <label>Metric<select id="metric" aria-describedby="metric-definition"></select></label>
 <label>Frequency<select id="frequency"><option value="all">All frequencies</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
 <label>Sparsity<select id="sparsity"><option value="all">All series</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+<div id="cutoff-controls" class="cutoff-controls" hidden>
+<label>Cutoffs from<input id="cutoff-from" type="date" aria-describedby="cutoff-help"></label>
+<label>Cutoffs through<input id="cutoff-through" type="date" aria-describedby="cutoff-help"></label>
+<button id="reset-cutoffs" type="button">Reset dates</button>
 </div>
+</div>
+<p class="hint" id="cutoff-help" hidden>Dates are inclusive forecast cutoffs. Each selected origin keeps all its forecast leads.</p>
 <p class="hint" id="metric-definition" aria-live="polite"></p>
 <details class="group metric-guide" id="metric-guide">
 <summary>Metric definitions and aggregation</summary>
@@ -61,7 +70,7 @@ details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summ
 <thead><tr><th scope="col">Family</th><th scope="col">Entries</th><th scope="col">Best score</th><th scope="col">Median entry score</th><th scope="col">Entries below SeasonalNaive</th></tr></thead>
 <tbody id="family-scores"></tbody>
 </table></div>
-<p class="hint" hidden id="family-pending">Family comparisons appear after every registered model has complete coverage for the selected slice.</p>
+<p class="hint" hidden id="family-pending"></p>
 <p class="hint" id="family-summary-key">The median gives each entry in its family equal weight. SeasonalNaive is a non-foundation entry, and the last column compares the other entries with it. Related model variants are counted as separate entries.</p>
 <h3 class="slice-heading">Best-score gaps by frequency and sparsity</h3>
 <p class="hint gap-key" id="family-gap-key">
@@ -75,6 +84,7 @@ details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summ
 <thead><tr><th scope="col">Frequency</th><th scope="col">All series</th><th scope="col">Low sparsity</th><th scope="col">Medium sparsity</th><th scope="col">High sparsity</th></tr></thead><tbody id="matrix"></tbody></table></div>
 </section>
 <section aria-labelledby="ranks-heading"><h2 id="ranks-heading">Model leaderboard</h2>
+<p class="hint">All foundation models in this table were run zero-shot.</p>
 <p class="hint" id="membership" aria-live="polite"></p>
 <div class="tablebox" tabindex="0" role="region" aria-label="Scrollable model leaderboard"><table class="scores"><caption class="sr">Model scores on the selected historical cohort</caption>
 <thead><tr><th scope="col" id="rank-header"><button data-sort="rank">Rank</button></th><th scope="col" id="name-header"><button data-sort="name">Model</button></th><th scope="col">Family</th><th scope="col" id="score-header"><button data-sort="score">Score</button></th><th scope="col" id="change_vs_seasonal-header"><button data-sort="change_vs_seasonal">Δ vs SeasonalNaive</button></th><th scope="col">Origin W / T / L<br>vs SeasonalNaive</th><th scope="col">Full panel coverage</th><th scope="col">Forecast construction</th></tr></thead>
@@ -88,9 +98,9 @@ details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summ
 </details></section>
 <section class="group"><details><summary>Evaluation methods</summary>
 <p>The historical cutoffs span 31 May to 30 August 2026. The panel contains 14 daily origins with seven leads, 13 weekly origins with one lead, and two monthly origins with one lead. A case is one series at one origin. Sparsity groups use the frozen Impermanent labels.</p>
-<p>Every model receives the observations available at its cutoff, with model-specific limits on usable context. Compatible models receive timestamp-derived calendar features. Foundation entries use frozen checkpoints in zero-shot mode. Locally fitted models use benchmark history available at each cutoff, with tuning and forecast calibration based on earlier development origins. SeasonalNaive is a fixed-rule reference. This compares the specified forecasting setups on matched cases.</p>
+<p>Every model receives the observations available at its cutoff, with model-specific limits on usable context. Compatible models receive timestamp-derived calendar features. Locally fitted models use benchmark history available at each cutoff. SeasonalNaive is a fixed-rule reference.</p>
 <p>Point metrics score each system’s submitted point forecast. The forecast-construction column shows when that point is the predictive median. Quantile metrics separately score the nine submitted quantiles. This retrospective comparison describes the models and forecast cases shown here.</p>
-<p class="hint"><a href="https://arxiv.org/html/2603.08707#S3">Impermanent evaluation protocol</a> · <a href="https://github.com/cbergmeir/open-commentary-forecasting-accuracy/blob/main/paper/paper.md">Forecast accuracy commentary draft</a> · <a href="https://github.com/cbergmeir/open-commentary-forecasting-accuracy/pull/7">Open discussion on forecast targets and fitting losses</a></p>
+<p class="hint"><a href="https://arxiv.org/html/2603.08707#S3">Impermanent evaluation protocol</a></p>
 </details></section>
 </main>
 <template id="guide-raw-quantile">
@@ -129,7 +139,6 @@ details>summary{cursor:pointer;font-weight:700;font-size:16px}details[open]>summ
 <div><dt>Aggregation</dt><dd data-guide-part="guide-arithmetic"></dd></div>
 <div><dt>Interpretation</dt><dd>With one lead, this is absolute error divided by the training root mean squared change. A conditional median minimizes that expected loss. With several leads, the score is proportional to the distance between the predicted and realized paths. Its expected loss favors a geometric median of the joint path. Small positive training scales can make a miss consequential.</dd></div>
 </dl>
-<p class="hint"><a href="https://github.com/cbergmeir/open-commentary-forecasting-accuracy/pull/6">Open commentary proposal on where to take the square root</a></p>
 </template>
 <template id="metric-guide-arithmetic_mase">
 <h3>MASE</h3>
@@ -161,6 +170,102 @@ const ss = ['all','low','medium','high'];
 const fc = x => x === 'Foundation' ? 'foundation' : 'nonfoundation';
 const args = new URL(location.href).searchParams;
 const closeScore = (a, b) => Math.abs(a - b) <= 1e-8 * (1 + Math.abs(b));
+function average(values) {
+    return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function median(values) {
+    const ordered = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(ordered.length / 2);
+    return ordered.length % 2 ? ordered[mid] : (ordered[mid - 1] + ordered[mid]) / 2;
+}
+
+function averageBy(origins, key, valuesFor) {
+    const groups = new Map();
+    for (const origin of origins) {
+        const id = origin[key];
+        if (!groups.has(id)) groups.set(id, []);
+        groups.get(id).push(...valuesFor(origin));
+    }
+    return average([...groups.values()].map(average));
+}
+
+function sliceByDate(data, metric, frequency, band, from, through) {
+    const origins = data.cutoff_groups.filter(row =>
+        (frequency === 'all' || row.frequency === frequency) && row.sparsity === band &&
+        row.cutoff >= from && row.cutoff <= through);
+    if (!origins.length) return {models: [], family: null, calibration: []};
+    const eligible = metric === 'mean_case_rmsse' ? 'rmsse_eligible' : 'series_cases';
+    const counts = {
+        origins: origins.length,
+        series_cases: origins.reduce((total, row) => total + row.series_cases, 0),
+        eligible_series_cases: origins.reduce((total, row) => total + row[eligible], 0),
+    };
+    const definitions = data.scores.filter(row =>
+        row.metric === metric && row.frequency === frequency && row.sparsity === band);
+    const unequalCases = (values) => values.some(value => value == null);
+    const models = definitions.map(row => {
+        const values = origins.map(origin => origin.entries[row.model]?.[metric]);
+        let score = null;
+        if (!unequalCases(values)) {
+            if (metric === 'faithful_paper_final') score = median(values.flat());
+            else if (metric === 'public_mase_normalized') {
+                score = averageBy(origins, 'cutoff', origin => origin.entries[row.model][metric]);
+            } else {
+                score = averageBy(origins, 'frequency', origin => [origin.entries[row.model][metric]]);
+            }
+        }
+        return {...row, ...counts, expected_origins: counts.origins, score, rank: null,
+            change_vs_seasonal: null, wins: null, ties: null, losses: null};
+    });
+    const complete = models.every(row => row.score != null);
+    const reference = models.find(row => row.model === 'seasonal_naive')?.score;
+
+    function pairedValue(origin, model) {
+        const value = origin.entries[model][metric];
+        if (metric === 'faithful_paper_final') return median(value);
+        if (metric === 'public_mase_normalized') return average(value);
+        return value;
+    }
+
+    for (const row of models) {
+        if (complete) {
+            row.rank = 1 + models.filter(other => other.score < row.score && !closeScore(other.score, row.score)).length;
+        }
+        if (row.model === 'seasonal_naive' || row.score == null || reference == null) continue;
+        if (reference > 0) row.change_vs_seasonal = 100 * (row.score / reference - 1);
+        row.wins = 0;
+        row.ties = 0;
+        row.losses = 0;
+        for (const origin of origins) {
+            const modelScore = pairedValue(origin, row.model);
+            const baselineScore = pairedValue(origin, 'seasonal_naive');
+            if (closeScore(modelScore, baselineScore)) row.ties++;
+            else if (modelScore < baselineScore) row.wins++;
+            else row.losses++;
+        }
+    }
+    let family = null;
+    if (complete) {
+        const best = label => Math.min(...models.filter(row => row.family === label).map(row => row.score));
+        const foundation = best('Foundation');
+        const other = best('Non-foundation');
+        family = {
+            difference: foundation - other,
+            relative: other > 0 ? 100 * (foundation / other - 1) : null,
+            leader: closeScore(foundation, other) ? 'tie' : foundation < other ? 'foundation' : 'nonfoundation',
+        };
+    }
+    const calibration = definitions.map(row => {
+        const scaled = {};
+        for (const field of ['inside80', 'width80', 'strict_median', 'inclusive_median']) {
+            scaled[field] = averageBy(origins, 'frequency', origin => [origin.entries[row.model].calibration[field]]);
+        }
+        return {model: row.model, ...scaled};
+    });
+    return {models, family, calibration};
+}
+
 let sort = 'score', ascending = true;
 for (const [key, metric] of Object.entries(data.metrics)) {
     const option = make('option', metric.label);
@@ -170,11 +275,50 @@ for (const [key, metric] of Object.entries(data.metrics)) {
 for (const id of ['metric','frequency','sparsity']) { const saved = args.get(id), el = get(id); if (saved && [...el.options].some(x => x.value === saved)) el.value = saved; el.addEventListener('change', render); }
 get('readiness').textContent = `${data.complete_models} of ${data.total_models} models complete · ${data.origins} origins · ${data.target_cells.toLocaleString()} target slots`;
 get('stamp').textContent = 'Updated ' + data.updated;
+const cutoffs = [...new Set((data.cutoff_groups ?? []).map(group => group.cutoff))].sort();
+const dateStart = get('cutoff-from');
+const dateEnd = get('cutoff-through');
+const firstCutoff = cutoffs[0];
+const lastCutoff = cutoffs[cutoffs.length - 1];
+if (cutoffs.length) {
+    get('cutoff-controls').hidden = false;
+    get('cutoff-help').hidden = false;
+    for (const field of [dateStart, dateEnd]) {
+        field.min = firstCutoff;
+        field.max = lastCutoff;
+        field.addEventListener('change', render);
+    }
+    dateStart.value = args.get('from') || firstCutoff;
+    dateEnd.value = args.get('through') || lastCutoff;
+    get('reset-cutoffs').onclick = () => {
+        dateStart.value = firstCutoff;
+        dateEnd.value = lastCutoff;
+        render();
+    };
+}
 function render(){
     const metric = get('metric').value, freq = get('frequency').value, sparsity = get('sparsity').value;
-    if (location.protocol !== 'file:') { const url = new URL(location.href); for (const [k,v] of Object.entries({metric,frequency:freq,sparsity})) url.searchParams.set(k,v); history.replaceState(null,'',url); }
+    const from = dateStart.value || firstCutoff;
+    const through = dateEnd.value || lastCutoff;
+    const dateFiltered = cutoffs.length > 0 && (from !== firstCutoff || through !== lastCutoff);
+    if (location.protocol !== 'file:') {
+        const url = new URL(location.href);
+        for (const [key, value] of Object.entries({metric, frequency: freq, sparsity})) url.searchParams.set(key,value);
+        if (cutoffs.length) {
+            for (const [key, value] of Object.entries({from, through})) {
+                if (dateFiltered) url.searchParams.set(key, value);
+                else url.searchParams.delete(key);
+            }
+        }
+        history.replaceState(null, '', url);
+    }
     get('metric-definition').textContent = data.metrics[metric].description;
-    const family = data.families.find(r => r.metric===metric && r.frequency===freq && r.sparsity===sparsity);
+    const selected = dateFiltered ? sliceByDate(data, metric, freq, sparsity, from, through) : {
+        models: data.scores.filter(r => r.metric === metric && r.frequency === freq && r.sparsity === sparsity),
+        family: data.families.find(r => r.metric === metric && r.frequency === freq && r.sparsity === sparsity),
+        calibration: data.calibration.filter(r => r.frequency === freq && r.sparsity === sparsity),
+    };
+    const {models, family, calibration} = selected;
     const guide = get('selected-metric-guide');
     if (guide.dataset.metric !== metric) {
         const fragment = get('metric-guide-' + metric).content.cloneNode(true);
@@ -184,19 +328,21 @@ function render(){
         guide.replaceChildren(fragment);
         guide.dataset.metric = metric;
     }
-    const models = data.scores.filter(r => r.metric === metric && r.frequency === freq && r.sparsity === sparsity);
     const summary = get('family-scores');
     summary.replaceChildren();
     get('family-summary-table').hidden = !family;
-    get('family-pending').hidden = Boolean(family);
+    const pending = get('family-pending');
+    pending.hidden = Boolean(family);
+    pending.textContent = models.length
+        ? 'Family comparisons require eligible scores from every model in the selected slice.'
+        : from > through ? 'Choose a start cutoff on or before the end cutoff.' : 'No forecast origins match these filters.';
     if (family) {
         const baseline = models.find(row => row.model === 'seasonal_naive')?.score;
         for (const label of ['Foundation', 'Non-foundation']) {
             const entries = models.filter(row => row.family === label).sort((a, b) => a.score - b.score);
             const bestScore = entries[0].score;
             const bestNames = entries.filter(row => closeScore(row.score, bestScore)).map(row => row.name);
-            const middle = Math.floor(entries.length / 2);
-            const median = entries.length % 2 ? entries[middle].score : (entries[middle - 1].score + entries[middle].score) / 2;
+            const medianScore = median(entries.map(entry => entry.score));
             const comparable = entries.filter(row => row.model !== 'seasonal_naive');
             const lower = comparable.filter(row => row.score < baseline && !closeScore(row.score, baseline)).length;
             const below = baseline == null || !comparable.length ? '—' : `${lower} / ${comparable.length}`;
@@ -204,7 +350,7 @@ function render(){
             const labelCell = make('th', label, 'family ' + fc(label)); labelCell.scope = 'row';
             const best = make('td', null, 'best');
             best.append(make('strong', format(bestScore)), make('small', bestNames.join(', ')));
-            tr.append(labelCell, make('td', entries.length, 'num'), best, make('td', format(median), 'num'), make('td', below, 'num'));
+            tr.append(labelCell, make('td', entries.length, 'num'), best, make('td', format(medianScore), 'num'), make('td', below, 'num'));
             summary.append(tr);
         }
     }
@@ -212,8 +358,13 @@ function render(){
     for(const [key,label] of fs){
         const tr=make('tr'); const title=make('th',label); title.scope='row'; tr.append(title);
         for(const band of ss){
-            const row=data.families.find(r => r.metric===metric && r.frequency===key && r.sparsity===band);
-            const td=make('td'); const b=make('button',row ? (row.leader==='tie'?'Tie':row.leader==='foundation'?'Foundation':'Non-foundation') : 'Pending',row?.leader);
+            const row = dateFiltered
+                ? (key === freq && band === sparsity ? family : sliceByDate(data, metric, key, band, from, through).family)
+                : data.families.find(r => r.metric === metric && r.frequency === key && r.sparsity === band);
+            const td=make('td');
+            const gapLabel = row ? (row.leader==='tie'?'Tie':row.leader==='foundation'?'Foundation':'Non-foundation') : 'No comparison';
+            const b=make('button',gapLabel,row?.leader);
+            b.disabled = !row;
             b.type='button'; b.setAttribute('aria-pressed',String(freq===key && sparsity===band));
             const description = `${label}, ${band==='all'?'all series':band+' sparsity'}: ${b.textContent}`;
             const gap = row ? (row.relative == null ? `${signed(row.difference)} score units` : `${pct(row.relative)} gap`) : '';
@@ -223,9 +374,16 @@ function render(){
             td.append(b);tr.append(td);
         } matrix.append(tr);
     }
-    const n=models.filter(r=>r.score != null).length, first=models[0];
-    const cases = `${first.eligible_series_cases.toLocaleString()} of ${first.series_cases.toLocaleString()} series–origin cases eligible`;
-    get('membership').textContent=`${n} of ${models.length} scores available · ${first.origins} origins · ${cases}` + (n!==models.length?' · Ranks pending full coverage':'');
+    const membership = get('membership');
+    if (models.length) {
+        const first = models[0], n = models.filter(r=>r.score != null).length;
+        const cases = `${first.eligible_series_cases.toLocaleString()} of ${first.series_cases.toLocaleString()} series–origin cases eligible`;
+        const range = dateFiltered ? ` · Cutoffs ${from} through ${through}` : '';
+        membership.textContent = `${n} of ${models.length} scores available · ${first.origins} origins · ${cases}${range}` +
+            (n!==models.length?' · Ranks require eligible scores from every model':'');
+    } else {
+        membership.textContent = from > through ? 'Choose a start cutoff on or before the end cutoff.' : 'No forecast origins match these filters.';
+    }
     for(const th of document.querySelectorAll('thead th[aria-sort]')) th.removeAttribute('aria-sort');
     get(sort+'-header').setAttribute('aria-sort',ascending?'ascending':'descending');
     models.sort((a,b)=>{
@@ -245,7 +403,7 @@ function render(){
     }
     const calib=get('calibration');calib.replaceChildren();
     const names=Object.fromEntries(models.map(x=>[x.model,x.name]));
-    for(const r of data.calibration.filter(r=>r.frequency===freq && r.sparsity===sparsity)){
+    for(const r of calibration){
         const tr=make('tr'); const th=make('th',names[r.model]); th.scope='row';
         tr.append(th,make('td',percent(r.inside80),'num'),make('td',format(r.width80),'num'),
                   make('td',percent(r.strict_median),'num'),make('td',percent(r.inclusive_median),'num'));calib.append(tr);
